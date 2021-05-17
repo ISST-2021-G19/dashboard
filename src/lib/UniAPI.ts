@@ -3,11 +3,8 @@ interface Course {
   name: string
   code: string
   year: number
-  type: string
-  group: string
   degree: string
 }
-
 
 interface Profile {
   name: string
@@ -16,9 +13,10 @@ interface Profile {
   avatar: string | null
 }
 
-interface Professor extends Profile {
+interface Professor {
+  name: string
   code: string
-  courses: string[]
+  email: string
 }
 
 interface ProfessorTrait {
@@ -53,6 +51,34 @@ interface SurveyStats {
   comments: string[]
 }
 
+async function doRequest(params: Omit<RequestInit, 'body'> & { url: string, body?: any }) {
+  const currentToken = window.localStorage.getItem('auth_token')
+  const url = 'http://83.34.31.26:5000' + params.url
+  const res = await fetch(url, {
+    mode: 'cors',
+    ...params,
+    headers: {
+      'content-type': 'application/json',
+      ...(currentToken ? { authorization: `Bearer ${currentToken}` } : undefined),
+      ...params.headers,
+    },
+    body: JSON.stringify(params.body),
+  })
+  
+  if (res.status >= 400) {
+    throw new Error('request error ' + res.status)
+  }
+
+  const bodyRes = await res.json()
+  
+  // Persist auth
+  if (url.includes('/login')) {
+    window.localStorage.setItem('auth_token', bodyRes.access_token)
+  }
+
+  return bodyRes
+}
+
 function createUniAPIClient() {
   const client = {
     async login(email: string, password: string): Promise<Profile> {
@@ -60,84 +86,36 @@ function createUniAPIClient() {
         throw new Error('Missing credentials')
       }
 
-      if (!email.endsWith('@alumnos.upm.es')) {
-        throw new Error('Unknown email provided')
-      }
+      // Request the token and allow the interceptors to handle it for us
+      await doRequest({
+        method: 'POST',
+        url: '/user/login',
+        body: { email, password, },
+      })
 
-      return {
-        name: 'Juan José',
-        surname: 'Herrero Barbosa',
-        email: 'juan.hbarbosa@alumnos.upm.es',
-        avatar: 'https://cdn.iconscout.com/icon/free/png-512/avatar-370-456322.png',
-      }
+      const profile = await doRequest({
+        method: 'GET',
+        url: '/user/profile',
+      })
+    
+      return profile
     },
 
-    async enrolledCourses(): Promise<Course[]> {
-      return [
-        {
-          id: '95000013',
-          code: '95000013',
-          name: 'Electromagnetismo',
-          type: 'T',
-          group: 'TST 25.1',
-          year: 2,
-          degree: 'GTIST',
-        },
-        {
-          id: '95000027',
-          code: '95000027',
-          name: 'Teoria de la Informacion',
-          type: 'B',
-          group: 'TST 35.1',
-          year: 3,
-          degree: 'GTIST',
-        },
-        {
-          id: '95000030',
-          code: '95000030',
-          name: 'Sistemas de Transmision',
-          type: 'B',
-          group: 'TST 35.1',
-          year: 3,
-          degree: 'GTIST',
-        },
-        {
-          id: '95000036',
-          code: '95000036',
-          name: 'Comunicaciones Opticas',
-          type: 'B',
-          group: 'TST35',
-          year: 3,
-          degree: 'GTIST',
-        },
-        {
-          year: 3,
-          id: '95000037',
-          code: '95000037',
-          name: 'Electronica de Comunicaciones',
-          type: 'B',
-          group: 'ECOM35.2',
-          degree: 'MUIT',
-        },
-        {
-          year: 4,
-          id: '95000053',
-          code: '95000053',
-          name: 'Ingenieria Web',
-          type: 'O',
-          group: 'TST 42.1',
-          degree: 'GIB',
-        },
-        {
-          year: 4,
-          id: '95000057',
-          code: '95000057',
-          name: 'Ing de Sistemas y Servicios Telematicos',
-          type: 'O',
-          group: 'TST 42.2',
-          degree: 'GIB',
-        },
-      ]
+    async enrolledCourses(): Promise<Course[]> {    
+      const subjects = await doRequest({
+        method: 'GET',
+        url: '/subjects',
+      })
+
+      const result = subjects.map((subject: any) => ({
+        id: subject.id,
+        code: subject.code,
+        name: subject.name,
+        year: subject.year,
+        degree: subject.degree,
+      }))
+
+      return result
     },
 
     async subject({ subjectId }: { subjectId: string }): Promise<Course> {
@@ -151,102 +129,41 @@ function createUniAPIClient() {
       return course
     },
 
-    async professors(params: {subjectId: string}): Promise<Professor[]> {
-      return [
-        {
-          code: '00001',
-          name: 'Belén',
-          surname: 'Galocha',
-          email: 'bgalocha@upm.es',
-          avatar: null,
-          courses: ['95000013','95000037'],
-        },
-        {
-          code: '00002',
-          name: 'Manuel',
-          surname: 'Sierra',
-          email: 'manuelsierra@upm.es',
-          avatar: null,
-          courses: ['95000030','95000013'],
+    async professors({ subjectId }: { subjectId: string }): Promise<Professor[]> {
+      const professors = await doRequest({
+        method: 'GET',
+        url: `/subjects/${subjectId}/professors`,
+      })
 
-        },
-        {
-          code: '00003',
-          name: 'Santiago',
-          surname: 'Pavón',
-          email: 'santipavon@upm.es',
-          avatar: null,
-          courses: ['95000053', '95000057'],
-
-        },
-        {
-          code: '00004',
-          name: 'Joaquín',
-          surname: 'Salvachua',
-          email: 'jsalvachua@upm.es',
-          avatar: null,
-          courses: ['95000027', '95000057'],
-
-        },
-        {
-          code: '00005',
-          name: 'Jesús',
-          surname: 'Grajal',
-          email: 'jesusgrajal@upm.es',
-          avatar: null,
-          courses: ['95000030', '95000036'],
-
-        },
-        {
-          code: '00006',
-          name: 'Mareca',
-          surname: 'Gonzalez',
-          email: 'marecagon@upm.es',
-          avatar: null,
-          courses: ['95000027', '95000030'],
-
-        },
-        {
-          code: '00007',
-          name: 'Tomás',
-          surname: 'Robles',
-          email: 'tomasrobles@upm.es',
-          avatar: null,
-          courses: ['95000037','95000036'],
-        },
-        {
-          code: '00008',
-          name: 'Juan Carlos',
-          surname: 'Yelmo',
-          email: 'jcarlosyelmo@upm.es',
-          avatar: null,
-          courses: ['95000053','95000036'],
-        },
-        {
-          code: '00009',
-          name: 'Victor',
-          surname: 'Villagra',
-          email: 'victorvillagra@upm.es',
-          avatar: null,
-          courses: ['95000053','95000036'],
-        },
-
-      ]
+      return professors.map((p: any) => ({
+        code: String(p.id).padStart(6, '0'),
+        name: p.name,
+        email: p.email,
+      }))
     },
     
-    async professorTraits(params: {subjectId: string}): Promise<ProfessorTrait[]> {
-      return [
-        {id: 't01', label: 'cercano' },
-        {id: 't02', label: 'impuntual' },
-        {id: 't03', label: 'accesible para tutorías' },
-        {id: 't04', label: 'clases amenas' },
-        {id: 't05', label: 'desorganizado' },
-        {id: 't06', label: 'se prepara las clases' },
-        {id: 't07', label: 'se pasa de la hora' },
-        {id: 't08', label: 'clases poco dinámicas' },
-        {id: 't09', label: 'buenos apuntes' },
-        {id: 't10', label: 'poco material de estudio' },
-      ]
+    async professorTraits({ subjectId }: { subjectId: string }): Promise<ProfessorTrait[]> {
+      const traits = await doRequest({
+        method: 'GET',
+        url: `/surveys/${subjectId}/traits`,
+      })
+
+      return traits.map((t: any) => ({
+        id: t.id,
+        label: t.label,
+      }))
+      // return [
+      //   {id: 't01', label: 'cercano' },
+      //   {id: 't02', label: 'impuntual' },
+      //   {id: 't03', label: 'accesible para tutorías' },
+      //   {id: 't04', label: 'clases amenas' },
+      //   {id: 't05', label: 'desorganizado' },
+      //   {id: 't06', label: 'se prepara las clases' },
+      //   {id: 't07', label: 'se pasa de la hora' },
+      //   {id: 't08', label: 'clases poco dinámicas' },
+      //   {id: 't09', label: 'buenos apuntes' },
+      //   {id: 't10', label: 'poco material de estudio' },
+      // ]
     },
 
     async subjectRating(params: {subjectId: string}): Promise<SubjectRating> {
@@ -257,7 +174,16 @@ function createUniAPIClient() {
       }
     },
 
-    async surveyQuestions(params: {subjectId: string}): Promise<SurveyQuestion[]> {
+    async surveyQuestions({ subjectId }: { subjectId: string }): Promise<SurveyQuestion[]> {
+      const questions = await doRequest({
+        method: 'GET',
+        url: `/surveys/${subjectId}/questions`,
+      })
+
+      return questions.map((q: any) => ({
+        id: q.id,
+        question: q.question,
+      }))
       return [
         {
           id: 'qa1',
@@ -302,34 +228,40 @@ function createUniAPIClient() {
     },
 
     async submitSurvey(surveyData: any) {
-      // FIXME: We need to properly type survey data here
-      console.log(surveyData)
+      await doRequest({
+        method: 'POST',
+        url: `/surveys`,
+        body: surveyData,
+      })
     },
 
     async surveyStats(params: { subjectId: string, professorId: string }): Promise<SurveyStats> {
       const { subjectId, professorId } = params
-      const [subject, questions, traits] = await Promise.all([
-        client.subject({ subjectId }),
-        client.surveyQuestions({ subjectId }),
-        client.professorTraits({ subjectId }),
-      ])
+
+      const stats = await doRequest({
+        method: 'GET',
+        url: `/stats/${subjectId}`,
+      })
+      const subject = await client.subject({ subjectId })
 
       return {
-        subjectId: subject.id,
-        subject: subject,
-        questions: questions.map(question => ({
-          questionId: question.id,
-          questionText: question.question,
-          dataset: [[0, 15], [1, 5], [2, 20], [3, 30], [4, 15]]
+        subjectId: subjectId,
+        subject,
+        questions: stats.questions.map((q: any)=> ({
+          questionId: q.questionId,
+          questionText: q.questionText,
+          dataset: q.dataset
+            .filter(([k]: any) => k > 0)
+            .map(([k, v]: any) => [k-1, v])
+            .sort(([, v1]:any, [, v2]: any) => v2 - v1),
+        }))
+        .sort((k1:any, k2:any) => String(k1.questionId).localeCompare(k2.questionId)),
+        traits: stats.traits.map((t: any) => ({
+          traitId: t.traitId,
+          traitLabel: t.traitLabel,
+          count: t.count,
         })),
-        traits: traits.map(trait => ({
-          traitId: trait.id,
-          traitLabel: trait.label,
-          count: Math.round(Math.random() * 100)
-        })),
-        comments: Array.from({ length: 40 })
-          .fill(null)
-          .map((_, idx) => (String(idx).repeat(20) + ' '))
+        comments: stats.comments.map((comment: any) => String(comment))
       }
     },
   }
@@ -373,6 +305,5 @@ export type { 
   Profile,
   SubjectRating,
   SurveyQuestion,
-  SurveyStats,
   UniAPIClient,
 }

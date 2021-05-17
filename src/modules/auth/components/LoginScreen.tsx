@@ -7,8 +7,8 @@ import * as S from './LoginScreen.styles'
 interface LoginScreenProps extends ViewProps {}
 
 function LoginScreen(props: LoginScreenProps) {
-  const [email, setEmail] = useState('test@alumnos.upm.es')
-  const [password, setPassword] = useState('test123')
+  const [email, setEmail] = useState('jm.delalamo@upm.es')
+  const [password, setPassword] = useState('profe')
   const dispatch = useDispatch()
   const simulateLogin = useCallback(async () => {
     await dispatch(login({ email, password }))

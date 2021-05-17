@@ -11,7 +11,7 @@ function DegreeSelector(props: DegreeSelectorProps) {
   const degrees = useSelector(degreeListSelector)
   const dispatch = useDispatch()
   const areAllDegreesEnabled = useSelector(areAllDegreesEnabledSelector)
-
+  console.log(degrees)
   return (
     <S.Container {...props}>
       {degrees.map(degree => (
